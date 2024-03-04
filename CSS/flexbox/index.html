@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="css1.css">
+    <style>
+    * {
+        box-sizing: content-box;
+    }
+    </style>
+</head>
+<body>
+
+    <div style="display: flex; justify-content:center; align-items:start; width: 100%; height: 60vh; background-color: aliceblue; gap: 10px; flex-direction: row; justify-content: space-evenly;">
+        <div style="border: 1px solid gray; width: 100px; height: 100px; flex-basis: ;">
+            <p>content 1</p>
+        </div>
+        <div style="border: 1px solid gray; width: 100px; height: 100px;">
+            <p>content 2</p>
+        </div>
+    </div>
+
+    <div style="border: 1px solid red; height: 200px;width: 200px;" >
+        <div style="position: relative;">
+            <p>Parent</p>
+            <div style="position: absolute; left: 10px; top: 50px; border: 1px solid green">
+                <p>child</p>
+            </div>
+        </div>
+
+    </div>
+    
+</body>
+</html>

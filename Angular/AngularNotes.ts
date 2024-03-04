@@ -1792,7 +1792,308 @@ WebWorker usage in Angular:
         
         Note: To sort the elements in an array without mutating the original array, use toSorted().
 
+    How Angular bootstraps or how Angular app loads/starts?
+=> There are two phases of Angular loads, 
+        1. Compile time:
+            a. Angular cli makes use of webpack as module bundler internally.
+            a. angular.json file is webpack's configuration file. Angular cli make use of this config file to build Angular app.
+            b. When you run ng server or ng build, the entry point of "main.ts" is configured in angular.json file.
+            c. in main.ts file, it bootstraps and root module.
+                platformBrowserDynamic().bootstrapModule(AppModule).then().catch()
+            d. The root module (AppModule) contains the bootstrap component(its AppComponent) and so on.
+            e. based on above configuration webpack creates main.[hash].js(basically Angular core + Router + app code etc..), runtime.[hash] (basically webpack),js and pollyfill.js files and injects them into the index.html.
+        2. RunTime:
+           a. When you hit URL in browser, the server serves the index.html file first.
+           b. The injected main.js, runtime.js etc. loads the script.
+           c. The webpack stores the all the modules like angular core, router in global variable.
+           d. Angular(vendor.js angular functions) looks for "root-selector" index.html, it acts as a container so that whether to inject angular app as starting point.
 
+angular.json file:
+==> 
+    "projects": {
+    "projectName": {
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:browser",
+          "options": {
+            "outputPath": "dist/projectName",
+            "index": "src/index.html",
+            "main": "src/main.ts",
+            "aot": true,
+            "buildOptimizer": true
+            "polyfills": [
+              "zone.js"
+            ],
+            "tsConfig": "tsconfig.app.json",
+            "assets": [
+              "src/favicon.ico",
+              "src/assets"
+            ],
+            "styles": [
+              "src/styles.css"
+            ],
+            "scripts": [] // to load external js files. However, its not good idea if file is large. Better create an angular service and load it from there. Example given below
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kb",
+                  "maximumError": "1mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "2kb",
+                  "maximumError": "4kb"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "buildOptimizer": false,
+              "optimization": false,
+              "vendorChunk": true,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "namedChunks": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular-devkit/build-angular:dev-server",
+          "configurations": {
+            "production": {
+              "browserTarget": "dymmy_angular:build:production"
+            },
+            "development": {
+              "browserTarget": "dymmy_angular:build:development"
+            }
+          },
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "proxy.config.json" //Important for developement
+          }
+        },
+
+    Load External script files after app loads or after login based on requirement.
+
+    in Angular.json file:
+     {
+        ...,
+        scripts: [
+            {
+                bundleName: "script1",
+                inject: false,
+                input: "{filepath}"
+            }
+        ],
+        ...
+     }
+        @Injectable()
+        export class ExternalScriptService {
+            EXTERNAL_SCRIPTS = [
+                "script1.js",
+                "script2.js"
+            ]
+
+            constructor() { }
+
+            init() { // call this method after login or app loads or lazy load module based on requirement.
+                for (let val of EXTERNAL_SCRIPTS)
+                    this.loadExternalScript(val);
+            }
+
+            loadExternalScript(url: string) {
+                const body = <HTMLDivElement>document.body;
+                const script = document.createElement('script');
+                script.innerHTML = '';
+                script.src = url;
+                script.async = false;
+                script.defer = true;
+                body.appendChild(script);
+            }
+        }
+
+    Angular - Difference between "optimization" and "buildOptimizer" in the build config (angular.json)
+   => buildOptimizer optimizes the transpilation of TS to JS (remove unused code, add tslib,..)
+      optimization:
+        a. Use code-splitting for bundle size reduce:
+                # webpack.config.js
+                optimization: {
+                    splitChunks: {
+                        // include all types of chunks
+                        chunks: 'all',
+                    }
+                }
+
+
+        
+    What is the difference between "@angular-devkit/build-angular:browser" and "@angular-devkit/build-angular:dev-server"
+    => 
+    Browser:
+        As in the source code of the browser builder, this builder uses the webpack package bundler to create a minified and agulified angular app for production. 
+        Webpack bundles the application modules and all their dependencies and put them in separat files in the specified dist folder. It also does extra work based on the configuration 
+        like tree shaking etc.
+        You should use this builder when you want to bundle minfiy (deploy) your angular application for production/staging or other deployment phases.
+
+    Dev-Server:
+        As mentioned in angular deployment guide angular uses webpack to build and serve the application using a node server with a specified port to create an angular app with mapped ts 
+        files for easier debugging. It also provides live reload on change. The application code will be compiled and the app files will be copied to the heap memory and opens.
+
+Ahead-of-time (AOT) compilation:
+    The Angular ahead-of-time (AOT) compiler converts your Angular HTML and TypeScript code into efficient JavaScript code during the build phase before the browser downloads and runs that code. 
+    Compiling your application during the build process provides a faster rendering in the browser.
+
+Choosing a compiler
+Angular offers two ways to compile your application:
+ANGULAR COMPILE	DETAILS
+    Just-in-Time (JIT)	Compiles your application in the browser at runtime. This was the default until Angular 8.
+    Ahead-of-Time (AOT)	Compiles your application and libraries at build time. This is the default starting in Angular 9.
+    When you run the ng build (build only) or ng serve (build and serve locally) CLI commands, the type of compilation (JIT or AOT) depends on the value of the aot property in your build 
+    configuration specified in angular.json. By default, aot is set to true for new CLI applications.    
+
+
+    If bundle size is huge, then how would you optiomize:
+        a.  Use code-splitting for bundle size reduce:
+                # webpack.config.js
+                optimization: {
+                    splitChunks: {
+                        // include all types of chunks
+                        chunks: 'all',
+                    }
+                }  
+        b. Do not include source maps:
+            configurations": {
+                "production": { 
+                    ...  
+                    "sourceMap": false,
+                    ...
+                },
+                "development": {
+                    "sourceMap": true,
+                }                            
+        c.Tree shaking
+        d. Minification
+        d. Compression: Used mostly by servers to compress the assets before serving them over to the network. Gzip is accepted by all browsers nowadays.
+                ex: express server:
+                    // add compression middleware
+                    app.use(compression());
+
+    JS engine which inbuilt language uses:
+    ==> Chrome's Javascript engine, V8, is written in C++
+
+    who pushes callback into the callstack:
+    ==> In JavaScript, the Event Loop pushes callbacks into the call stack when the call stack is empty. The Event Loop monitors the call stack and task queue continuously. 
+    When a timer expires, the callback function is put in the Callback Queue. When the method registers a callback function, the Event Loop ensures it's added to the call stack 
+    for execution when the stack is empty. 
+
+    How garbage collection works in javascript?
+    ==> The garbage collector works by traversing the object graph and marking objects that are reachable. Unreachable objects are then removed in the next step.
+        The object graph is a graph of all the objects in the program. Each object in the graph is connected to the objects that it references. The garbage collector starts at the root objects,
+        which are the objects that are global or that are referenced by global objects. The garbage collector then traverses the object graph, marking all the objects that it reaches.
+        Once the garbage collector has marked all the reachable objects, it removes all the unreachable objects. Unreachable objects are objects that are not referenced by any other object 
+        in the program. The garbage collector runs automatically, so the programmer does not need to explicitly call it. The garbage collector will run when it detects that there is memory 
+        that can be reclaimed.
+
+        When garbage collector runs?
+        => The garbage collector uses a technique called the "mark-and-sweep" algorithm to identify and remove objects that are no longer in use. The mark-and-sweep algorithm works 
+           by first marking all objects that are reachable from the global object. The global object is a special object that is always reachable. 
+           Once all reachable objects have been marked, the garbage collector sweeps through the memory and removes all objects that are not marked.
+         
+           The garbage collector runs automatically, but there are a few things that you can do to help it run more efficiently:
+                Avoid creating unnecessary objects.
+                Avoid holding on to objects that you no longer need.
+                Use a memory profiler to identify and fix memory leaks.
+
+            Here are some specific examples of when the garbage collector might run:
+                When a function returns, the garbage collector will collect any objects that were created inside the function and are no longer in use.
+                When an object is assigned to a new variable, the garbage collector will collect the old object if it is no longer in use.
+                When an object is removed from an array, the garbage collector will collect the object if it is no longer in use.
+
+
+
+    How DOM gets loaded into the browser?
+    => 
+        HTML Parsing:
+        When you enter a URL in your browser, the browser makes a request to the server, which responds with an HTML document.
+
+        Tokenizing involves breaking down the HTML code into individual tokens.
+        Lexing, short for lexical analysis, is the process of converting these tokens into objects with properties and methods.
+        
+        DOM Tree Construction:
+        The browser constructs the Document Object Model (DOM) tree,
+        Each HTML element becomes a node in the DOM tree, with parent-child relationships based on the HTML structure.
+        
+        Object Creation:
+        As the HTML elements are parsed and processed, corresponding objects, or nodes, are created in memory.
+        These nodes have properties and methods that allow developers to interact with and manipulate the document through JavaScript.
+        
+        Script Execution:
+        The browser encounters and executes script tags during the parsing process.
+        
+        CSSOM Construction:
+        While constructing the DOM, the browser also parses and interprets CSS stylesheets.
+
+        Render Tree Construction:
+        The browser combines the DOM and CSSOM to create the render tree.
+        The render tree is a subset of the DOM that includes only the nodes required for rendering the visible content on the page, considering styles and layout information.
+        
+        Layout:
+        Layout, also known as reflow, involves calculating the position and size of each element on the page.
+        The browser determines the dimensions and positioning based on the styles, content, and the structure of the render tree.
+        
+        Painting:
+        Painting is the process of rendering the pixels on the screen based on the calculated layout.
+        It involves drawing the visual content onto the visible area of the browser window.
+        
+        DOMContentLoaded Event:
+        The DOMContentLoaded eent is fired when the initial HTML document is fully parsed, and the DOM is constructed.
+        
+        Load Event: Fires once everything loaded.
+
+
+    When not to use arrow functions?
+    => Arrow functions in JavaScript offer a concise syntax and lexical scoping, making them a powerful and convenient feature in many situations. However, 
+    there are specific scenarios where using arrow functions may not be the best choice:   
+    
+    Object Methods:
+        When defining methods inside an object, arrow functions are not suitable because they do not have their own this context. The this value in an arrow function is inherited 
+        from the enclosing scope, which can lead to unexpected behavior.
+        const obj = {
+            // Avoid using arrow function for object methods
+            method: () => {
+                // 'this' in this context does not refer to 'obj', it refers to window object or its lexical scope depends on context
+            }
+        };
+
+    Constructor Functions:
+        Arrow functions cannot be used as constructor functions to create instances of objects. They lack the new.target binding, and using them with new can lead to errors.
+        // Avoid using arrow function as constructor
+        const Example = () => {
+            // 'this' in this context is not what you expect
+        };
+        const instance = new Example(); // Error
+        
+    Event Handlers:
+        Arrow functions might not be the best choice for event handlers, especially when the this context needs to refer to the element triggering the event.
+        const button = document.getElementById('myButton');
+        // Avoid using arrow function for event handlers
+        button.addEventListener('click', () => {
+            // 'this' in this context does not refer to 'button'
+        });
+    
+    Methods in Classes:
+        When defining methods in ES6 classes, it's generally better to use regular function syntax. Class methods should have their own this context, which arrow functions don't provide.
+        class MyClass {
+            // Avoid using arrow function for class methods
+            method() {
+                // 'this' in this context refers to the instance of MyClass
+            }
+        }
 
 
     
